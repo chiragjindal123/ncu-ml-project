@@ -172,6 +172,7 @@
       const input = inputElem.value.trim();
       if (!input) return;
       const model = document.querySelector('input[name="model"]:checked').value;
+      const useRag = document.getElementById("rag-toggle").checked; 
       const chatbox = document.getElementById("chatbox");
 
       // User message
@@ -198,7 +199,7 @@
       let res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, model: model })
+        body: JSON.stringify({ message: input, model: model, use_rag: useRag })
       });
 
       let data = await res.json();

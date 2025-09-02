@@ -42,7 +42,7 @@ def chat():
     data = request.json
     user_input = data.get("message")
     model = data.get("model")  # "gemini" or "ollama"
-    use_rag = data.get("use_rag", True)
+    use_rag = data.get("use_rag")
     
     save_message("user", user_input)
 
