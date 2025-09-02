@@ -137,6 +137,16 @@
       <label><input type="radio" name="model" value="gemini" checked> Gemini</label>
       <label><input type="radio" name="model" value="ollama"> Ollama</label>
     </div>
+    <div style="text-align:center; margin-bottom:10px;">
+    <label>
+        <input type="checkbox" id="rag-toggle" checked>
+        Use RAG (Retrieval Augmented Generation)
+    </label>
+    </div>
+    <form id="upload-form" style="text-align:center; margin-bottom:10px;">
+    <input type="file" id="file-input" />
+    <button type="submit">Upload File</button>
+    </form>
     <div id="chatbox"></div>
     <form class="input-row" onsubmit="sendMessage(); return false;">
       <input type="text" id="prompt" placeholder="Type your question..." autocomplete="off" />
@@ -199,6 +209,21 @@
       }
       chatbox.scrollTop = chatbox.scrollHeight;
     }
+
+    document.getElementById("upload-form").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById("file-input");
+        if (!fileInput.files.length) return;
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+        });
+        const data = await res.json();
+        alert(data.message);
+        fileInput.value = "";
+    });
 
     // Optional: Enter key submits
     document.getElementById("prompt").addEventListener("keydown", function(e) {
