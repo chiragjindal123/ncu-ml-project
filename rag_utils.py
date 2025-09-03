@@ -41,3 +41,24 @@ def get_context(query, top_k=3):
     conn.close()
     return "\n".join(r[0] for r in rows) if rows else "No context found."
 
+def save_message(role, content):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO messages (role, content) VALUES (%s, %s)",
+        (role, content)
+    )
+    conn.commit()
+    conn.close()
+
+def chunk_text(text, chunk_size=1000, overlap=200):
+    """Split text into overlapping chunks for better retrieval."""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunk = text[start:end]
+        if chunk.strip():
+            chunks.append(chunk)
+        start += chunk_size - overlap
+    return chunks

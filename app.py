@@ -3,39 +3,25 @@ import requests
 import subprocess
 import psycopg2
 import json
-from rag_utils import get_context, get_embedding
+from rag_utils import get_context, get_embedding, save_message, get_connection, chunk_text
 import os
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
 import docx
+from dotenv import load_dotenv
 
-
+load_dotenv()
 app = Flask(__name__)
 
 # --- CONFIG ---
-GEMINI_API_KEY = "AIzaSyCb7gAoVeXmrascLigIfgXiXf2dCbhsYlc"
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_URL = os.getenv("GEMINI_URL")
 
 # --- ROUTES ---
 @app.route("/")
 def index():
     return render_template("index.html")
 
-def save_message(role, content):
-    conn = psycopg2.connect(
-        dbname="aidb",
-        user="aiuser",
-        password="aipassword",
-        host="localhost",
-        port="5432"
-    )
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO messages (role, content) VALUES (%s, %s)",
-        (role, content)
-    )
-    conn.commit()
-    conn.close()
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -60,13 +46,23 @@ def chat():
             "contents": [{"parts": [{"text": final_prompt}]}]
         }
         response = requests.post(GEMINI_URL, headers=headers, data=json.dumps(payload))
-        reply = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        try:
+            data = response.json()
+            if "candidates" in data and data["candidates"]:
+                reply = data["candidates"][0]["content"]["parts"][0]["text"]
+            elif "error" in data:
+                reply = f"Gemini API error: {data['error'].get('message', 'Unknown error')}"
+            else:
+                reply = "Gemini API returned an unexpected response."
+        except Exception as e:
+            reply = f"Failed to parse Gemini API response: {str(e)}"
 
     elif model == "ollama":
         result = subprocess.run(
             ["ollama", "run", "llama3:8b"],
             input=final_prompt,
             text=True,
+            encoding="utf-8",
             capture_output=True
         )
         reply = result.stdout.strip()
@@ -106,22 +102,19 @@ def upload():
     if not content.strip():
         return jsonify({"message": "No extractable text found in the file."}), 400
 
-    embedding = get_embedding(content)
-    conn = psycopg2.connect(
-        dbname="aidb",
-        user="aiuser",
-        password="aipassword",
-        host="localhost",
-        port="5432"
-    )
+    chunks = chunk_text(content, chunk_size=1000, overlap=200)
+    conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO documents (content, embedding) VALUES (%s, %s::vector)",
-        (content, f"[{','.join(str(x) for x in embedding)}]")
-    )
+    for chunk in chunks:
+        embedding = get_embedding(chunk)
+        cur.execute(
+            "INSERT INTO documents (content, embedding) VALUES (%s, %s::vector)",
+            (chunk, f"[{','.join(str(x) for x in embedding)}]")
+        )
     conn.commit()
     conn.close()
-    return jsonify({"message": "File uploaded and embedded successfully."})
+    return jsonify({"message": f"File uploaded and embedded in {len(chunks)} chunks."})
+
 
 
 if __name__ == "__main__":
