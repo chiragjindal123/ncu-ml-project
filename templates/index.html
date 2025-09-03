@@ -11,7 +11,9 @@
       padding: 0;
     }
     .container {
-      max-width: 500px;
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
       margin: 40px auto;
       background: #fff;
       border-radius: 12px;
@@ -34,7 +36,8 @@
       background: #f9fafc;
       border-radius: 8px;
       padding: 12px;
-      height: 320px;
+      height: 350px;
+      font-size: 1.1rem;
       overflow-y: auto;
       margin-bottom: 16px;
       box-sizing: border-box;
@@ -130,6 +133,7 @@
   </style>
 </head>
 <body>
+  <div id="particles-js" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;"></div>
   <div class="container">
     <h2>TA AI</h2>
     <div class="subtitle">Your Teaching Assistant Chatbot</div>
@@ -154,7 +158,25 @@
     </form>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
   <script>
+    particlesJS("particles-js", {
+      "particles": {
+        "number": { "value": 60 },
+        "color": { "value": "#6366f1" },
+        "shape": { "type": "circle" },
+        "opacity": { "value": 0.3 },
+        "size": { "value": 3 },
+        "line_linked": { "enable": true, "distance": 150, "color": "#6366f1", "opacity": 0.2, "width": 1 },
+        "move": { "enable": true, "speed": 2 }
+      },
+      "interactivity": {
+        "detect_on": "canvas",
+        "events": { "onhover": { "enable": true, "mode": "repulse" } }
+      },
+      "retina_detect": true
+    });
+    
     function escapeHTML(str) {
       return str.replace(/[&<>"']/g, function(m) {
         return ({

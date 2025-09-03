@@ -32,10 +32,40 @@ def chat():
     
     save_message("user", user_input)
 
-    # Add RAG context
+    prompt_lower = user_input.lower()
+    if any(word in prompt_lower for word in ["quiz", "question", "test", "mcq"]):
+        task = "quiz"
+        # use_rag = True
+    elif any(word in prompt_lower for word in ["implement", "practice", "code", "program", "exercise"]):
+        task = "practice"
+        # use_rag = True
+    elif any(word in prompt_lower for word in ["review", "explain", "summarize", "summary"]):
+        task = "review"
+        # use_rag = True
+    else:
+        task = "general"
+        # use_rag = False
+
     rag_context = get_context(user_input) if use_rag else ""
-    
-    final_prompt = f"Context:\n{rag_context}\n\nQuestion:\n{user_input}"
+
+    # --- Prompt Engineering ---
+    if task == "review":
+        task_prompt = f"Review the following material and explain it simply:\n{user_input}"
+    elif task == "quiz":
+        task_prompt = (
+            "Generate 5 quiz questions (with answers) in a numbered list:\n"
+            f"{user_input}"
+        )
+    elif task == "practice":
+        task_prompt = (
+            "Give me a practical implementation exercise (with a brief solution):\n"
+            f"{user_input}"
+        )
+    else:
+        task_prompt = user_input
+
+    final_prompt = f"Context:\n{rag_context}\n\nTask:\n{task_prompt}"
+
 
     if model == "gemini":
         headers = {
