@@ -1,1 +1,2 @@
 docker run --name ai_pgvector -e POSTGRES_USER=aiuser -e POSTGRES_PASSWORD=aipassword -e POSTGRES_DB=aidb -p 5432:5432 -d ankane/pgvector
+InfinityEmbeddings(model="", infinity_api_url="http://localhost:8080") also docker for this
