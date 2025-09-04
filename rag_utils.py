@@ -19,7 +19,6 @@ def get_embedding(text):
         return dense_model.embed_query(text)
     except Exception as e:
         print("Embedding error:", e)
-        import numpy as np
         return np.random.rand(768).tolist()
 
 def get_context(query, top_k=3):
