@@ -11,7 +11,9 @@
       padding: 0;
     }
     .container {
-      max-width: 500px;
+      position: relative;
+      z-index: 1;
+      max-width: 700px;
       margin: 40px auto;
       background: #fff;
       border-radius: 12px;
@@ -34,7 +36,8 @@
       background: #f9fafc;
       border-radius: 8px;
       padding: 12px;
-      height: 320px;
+      height: 350px;
+      font-size: 1.1rem;
       overflow-y: auto;
       margin-bottom: 16px;
       box-sizing: border-box;
@@ -130,6 +133,7 @@
   </style>
 </head>
 <body>
+  <div id="particles-js" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:0;"></div>
   <div class="container">
     <h2>TA AI</h2>
     <div class="subtitle">Your Teaching Assistant Chatbot</div>
@@ -137,6 +141,16 @@
       <label><input type="radio" name="model" value="gemini" checked> Gemini</label>
       <label><input type="radio" name="model" value="ollama"> Ollama</label>
     </div>
+    <div style="text-align:center; margin-bottom:10px;">
+    <label>
+        <input type="checkbox" id="rag-toggle" checked>
+        Use RAG (Retrieval Augmented Generation)
+    </label>
+    </div>
+    <form id="upload-form" style="text-align:center; margin-bottom:10px;">
+    <input type="file" id="file-input" />
+    <button type="submit">Upload File</button>
+    </form>
     <div id="chatbox"></div>
     <form class="input-row" onsubmit="sendMessage(); return false;">
       <input type="text" id="prompt" placeholder="Type your question..." autocomplete="off" />
@@ -144,7 +158,25 @@
     </form>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
   <script>
+    particlesJS("particles-js", {
+      "particles": {
+        "number": { "value": 60 },
+        "color": { "value": "#6366f1" },
+        "shape": { "type": "circle" },
+        "opacity": { "value": 0.3 },
+        "size": { "value": 3 },
+        "line_linked": { "enable": true, "distance": 150, "color": "#6366f1", "opacity": 0.2, "width": 1 },
+        "move": { "enable": true, "speed": 2 }
+      },
+      "interactivity": {
+        "detect_on": "canvas",
+        "events": { "onhover": { "enable": true, "mode": "repulse" } }
+      },
+      "retina_detect": true
+    });
+    
     function escapeHTML(str) {
       return str.replace(/[&<>"']/g, function(m) {
         return ({
@@ -162,6 +194,7 @@
       const input = inputElem.value.trim();
       if (!input) return;
       const model = document.querySelector('input[name="model"]:checked').value;
+      const useRag = document.getElementById("rag-toggle").checked; 
       const chatbox = document.getElementById("chatbox");
 
       // User message
@@ -188,7 +221,7 @@
       let res = await fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, model: model })
+        body: JSON.stringify({ message: input, model: model, use_rag: useRag })
       });
 
       let data = await res.json();
@@ -199,6 +232,21 @@
       }
       chatbox.scrollTop = chatbox.scrollHeight;
     }
+
+    document.getElementById("upload-form").addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById("file-input");
+        if (!fileInput.files.length) return;
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        const res = await fetch("/upload", {
+        method: "POST",
+        body: formData
+        });
+        const data = await res.json();
+        alert(data.message);
+        fileInput.value = "";
+    });
 
     // Optional: Enter key submits
     document.getElementById("prompt").addEventListener("keydown", function(e) {
