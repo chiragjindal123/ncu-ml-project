@@ -3,6 +3,7 @@ import requests
 import subprocess
 import psycopg2
 import json
+import re
 from rag_utils import get_context, get_embedding, save_message, get_connection, chunk_text
 import os
 from werkzeug.utils import secure_filename
@@ -53,8 +54,10 @@ def chat():
         task_prompt = f"Review the following material and explain it simply:\n{user_input}"
     elif task == "quiz":
         task_prompt = (
-            "Generate 5 quiz questions (with answers) in a numbered list:\n"
-            f"{user_input}"
+            "Generate 5 multiple-choice quiz questions in the following JSON format:\n"
+            '[{"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"}, ...]\n'
+            f"Material:\n{user_input}\n"
+            "Do not include explanations. Only output valid JSON."
         )
     elif task == "practice":
         task_prompt = (
@@ -99,9 +102,24 @@ def chat():
 
     else:
         reply = "Invalid model selection."
-
-    save_message("ai", reply)
-    return jsonify({"reply": reply})
+    
+    if task == "quiz":
+        # Try to extract JSON from the reply
+        match = re.search(r"\[.*\]", reply, re.DOTALL)
+        if match:
+            try:
+                quiz_json = json.loads(match.group(0))
+                save_message("ai", str(quiz_json))
+                return jsonify({"quiz": quiz_json})
+            except Exception as e:
+                save_message("ai", reply)
+                return jsonify({"reply": "Failed to parse quiz JSON."})
+        else:
+            save_message("ai", reply)
+            return jsonify({"reply": "No quiz found in response."})
+    else:
+        save_message("ai", reply)
+        return jsonify({"reply": reply})
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -145,7 +163,46 @@ def upload():
     conn.close()
     return jsonify({"message": f"File uploaded and embedded in {len(chunks)} chunks."})
 
+@app.route("/score_quiz", methods=["POST"])
+def score_quiz():
+    data = request.json
+    quiz = data.get("quiz", [])
+    answers = data.get("answers", [])
+    score = 0
+    
+    for q, user_answer in zip(quiz, answers):
+        if not user_answer:  # Skip if no answer
+            continue
+            
+        correct_answer = q.get("answer")
+        
+        # Convert full answers to just their option letter
+        def get_letter(answer):
+            if not answer:
+                return None
+            # If it's just a letter, return it
+            if len(answer) == 1:
+                return answer.upper()
+            # If it starts with a letter and a dot/space/period
+            if len(answer) > 1 and answer[0].isalpha() and answer[1] in '. ':
+                return answer[0].upper()
+            # If it's a full answer, check for exact match or contained text
+            for i, opt in enumerate(q.get("options", [])):
+                if answer.lower().strip() == opt.lower().strip():
+                    return chr(65 + i)  # Convert 0->A, 1->B, etc.
+            return None
 
+        user_letter = get_letter(user_answer)
+        correct_letter = get_letter(correct_answer)
+        
+        if user_letter and correct_letter and user_letter == correct_letter:
+            score += 1
+                
+    return jsonify({
+        "score": score,
+        "total": len(quiz),
+        "answers": [q.get("answer") for q in quiz]
+    })
 
 if __name__ == "__main__":
     app.run(debug=True)

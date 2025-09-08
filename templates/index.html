@@ -189,6 +189,70 @@
       });
     }
 
+    // Add this function outside sendMessage()
+    async function submitQuiz(buttonElement) {
+      const aiMsgElem = buttonElement.closest('.msg.ai');
+      if (!aiMsgElem) return;
+
+      // Get stored quiz data
+      const quizData = JSON.parse(aiMsgElem.dataset.quizData);
+      
+      // Collect answers
+      let answers = [];
+      quizData.forEach((_, idx) => {
+        const selected = aiMsgElem.querySelector(`input[name="q${idx}"]:checked`);
+        answers.push(selected ? selected.value : null);
+      });
+
+      try {
+        // Send answers for scoring
+        const scoreRes = await fetch("/score_quiz", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quiz: quizData, answers: answers })
+        });
+        
+        const scoreData = await scoreRes.json();
+        
+        // Show results
+        const resultsDiv = aiMsgElem.querySelector('#quiz-results');
+        let resultHtml = `
+          <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb">
+            <div style="font-size:1.1em; font-weight:bold; margin-bottom:16px">
+              Your Score: ${scoreData.score} / ${quizData.length}
+            </div>
+        `;
+
+        // Show correct answers with formatting
+        quizData.forEach((q, idx) => {
+          const userAnswer = answers[idx];
+          const isCorrect = userAnswer === q.answer;
+          
+          resultHtml += `
+            <div style="margin-bottom:12px">
+              <div style="font-weight:bold">Q${idx + 1}:</div>
+              <div style="margin-left:16px">
+                <div>Your answer: <span style="color:${isCorrect ? '#059669' : '#dc2626'}">${userAnswer || 'Not answered'}</span></div>
+                <div>Correct answer: <span style="color:#2563eb">${q.answer}</span></div>
+              </div>
+            </div>
+          `;
+        });
+        
+        resultHtml += '</div>';
+        resultsDiv.innerHTML = resultHtml;
+
+        // Disable the form
+        aiMsgElem.querySelectorAll("input, button").forEach(el => {
+          el.disabled = true;
+        });
+        
+      } catch (error) {
+        console.error('Error submitting quiz:', error);
+        alert('Failed to submit quiz. Please try again.');
+      }
+    };
+
     async function sendMessage() {
       const inputElem = document.getElementById("prompt");
       const input = inputElem.value.trim();
@@ -227,8 +291,51 @@
       let data = await res.json();
       const aiMsgElem = document.getElementById(aiMsgId);
       if (aiMsgElem) {
-        // Render markdown as HTML
-        aiMsgElem.querySelector('.bubble').innerHTML = marked.parse(data.reply);
+        if (data.quiz) {
+          // Store quiz data in a variable accessible to the submit handler
+          aiMsgElem.dataset.quizData = JSON.stringify(data.quiz);
+          
+          // Render quiz form
+          let quizHtml = '<div class="quiz-container">';
+          quizHtml += '<form id="quiz-form" class="quiz-form" onsubmit="return false;">';
+          
+          data.quiz.forEach((q, idx) => {
+            quizHtml += `
+              <div class="question" style="margin-bottom:20px;">
+                <p style="font-weight:bold">Q${idx + 1}: ${escapeHTML(q.question)}</p>
+                <div class="options" style="margin-left:20px">
+            `;
+            
+            q.options.forEach((opt) => {
+              quizHtml += `
+                <div style="margin:8px 0">
+                  <label style="display:block">
+                    <input type="radio" name="q${idx}" value="${escapeHTML(opt)}">
+                    <span style="margin-left:8px">${escapeHTML(opt)}</span>
+                  </label>
+                </div>
+              `;
+            });
+            
+            quizHtml += `
+                </div>
+              </div>
+            `;
+          });
+          
+          quizHtml += `
+            <button type="button" onclick="submitQuiz(this)" style="margin-top:16px">Submit Quiz</button>
+            </form>
+            <div id="quiz-results"></div>
+          </div>`;
+
+          aiMsgElem.querySelector('.bubble').innerHTML = quizHtml;
+
+          
+        } else {
+          // Render normal message
+          aiMsgElem.querySelector('.bubble').innerHTML = marked.parse(data.reply || "");
+        }
       }
       chatbox.scrollTop = chatbox.scrollHeight;
     }
